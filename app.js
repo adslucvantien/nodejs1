@@ -1,4 +1,7 @@
 const mongodb = require('mongodb').MongoClient;
+
+const {ObjectId} = require("mongodb");
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -64,9 +67,69 @@ app.get('/list', (req, res) => {
 */
 
 
+app.get('/student/:baseId', (req, res) => {
+  const baseId = req.params.baseId;
+  const url = process.env.MONGODB_URL;
+  console.log(baseId);
+
+  mongodb.connect(url)
+    .then(async (client) => {
+      try {
+        const db = client.db();
+        const collection = db.collection('student');
+
+        const student = await collection.findOne({ _id: new ObjectId(baseId) });
+
+        if (student) {
+          res.send(student);
+        } else {
+          res.status(404).send('Student not found');
+        }
+      } finally {
+        client.close();
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      res.status(500).send('An error occurred');
+    });
+});
 
 
-app.post('/addstudent', async (req, res) => {
+app.put('/student/:baseId', (req, res) => {
+  const baseId = req.params.baseId;
+  const updatedStudent = req.body;
+  const url = process.env.MONGODB_URL;
+  console.log(baseId);
+
+  mongodb.connect(url)
+    .then(async (client) => {
+      try {
+        const db = client.db();
+        const collection = db.collection('student');
+
+        const result = await collection.updateOne(
+          { _id: new ObjectId(baseId) },
+          { $set: updatedStudent }
+        );
+
+        if (result.matchedCount > 0) {
+          res.send('Student information updated');
+        } else {
+          res.status(404).send('Student not found');
+        }
+      } finally {
+        client.close();
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      res.status(500).send('An error occurred');
+    });
+});
+
+
+app.post('/add', async (req, res) => {
   try {
     const url = process.env.MONGODB_URL;
 
@@ -81,21 +144,22 @@ app.post('/addstudent', async (req, res) => {
     const db = client.db();
     const collection = db.collection('student');
 
-    const newStudent = {
-      name,
-      age,
-      aclass,
-      createdAt: new Date()
-    };
+    try {
+      const newStudent = { _id: newStudentId, name, age, aclass };
 
-    await collection.insertOne(newStudent);
+      await collection.insertOne(newStudent);
 
-    res.send('Student inserted successfully!');
+      res.send('Student inserted successfully!');
+    } finally {
+      client.close();
+    }
   } catch (error) {
     console.error('Error:', error);
     res.status(500).send('An error occurred');
   }
 });
+
+
 
 // Start the server
 app.listen(port, () => {
